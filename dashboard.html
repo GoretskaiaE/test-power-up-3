@@ -287,7 +287,7 @@ function makeStripeCanvas(hexColor, direction) {
 }
 
 var t = window.TrelloPowerUp.iframe({
-  appKey:  'TESTAPIKEY',
+  appKey:  '1e181092ba164b6c2a0c3fdd3edcf98f',
   appName: 'HR Dashboard (installation test)'
 });
 
@@ -1575,7 +1575,7 @@ t.render(function() {
 
       // getRestApi() only provides auth helpers — use getToken() + fetch() for actual calls
       return restApi.getToken().then(function(token) {
-        var key  = 'TESTAPIKEY';
+        var key  = '1e181092ba164b6c2a0c3fdd3edcf98f';
         var base = 'https://api.trello.com';
 
         function apiFetch(path) {
