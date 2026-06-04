@@ -1,0 +1,1772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HR Dashboard (installation test)</title>
+
+  <script src="https://p.trellocdn.com/power-up.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f4f5f7;
+      color: #172b4d;
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      gap: 12px;
+    }
+    .header-left { flex: 1; }
+    .header-left h1 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #172b4d;
+    }
+    .header-left .subtitle {
+      font-size: 12px;
+      color: #6b778c;
+      margin-top: 2px;
+    }
+
+    /* ── Dashboard Switcher Dropdown ── */
+    .switcher-wrap { flex-shrink: 0; }
+    .switcher-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: flex-end;
+    }
+    .switcher {
+      appearance: none;
+      -webkit-appearance: none;
+      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b778c'/%3E%3C/svg%3E") no-repeat right 10px center;
+      border: 1px solid #dfe1e6;
+      border-radius: 6px;
+      padding: 7px 30px 7px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #172b4d;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+      transition: border-color 0.15s;
+      min-width: 190px;
+    }
+    .switcher:hover { border-color: #0052cc; }
+    .switcher:focus { outline: none; border-color: #0052cc; box-shadow: 0 0 0 2px rgba(0,82,204,0.2); }
+
+    /* ── Stat Cards Row ── */
+    .stats-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background: white;
+      border-radius: 8px;
+      padding: 14px 18px;
+      flex: 1;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .stat-card .num {
+      font-size: 28px;
+      font-weight: 800;
+      color: #0052cc;
+      line-height: 1;
+    }
+    .stat-card .label {
+      font-size: 11px;
+      color: #6b778c;
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── Chart Card ── */
+    .chart-card {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .chart-card h2 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #6b778c;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+    }
+    .chart-wrapper {
+      position: relative;
+      height: 260px;
+    }
+
+    /* ── Loading / Error ── */
+    .state-msg {
+      text-align: center;
+      padding: 60px 20px;
+      color: #6b778c;
+      font-size: 14px;
+    }
+    .state-msg .icon { font-size: 32px; margin-bottom: 10px; }
+
+    /* ── Item List (below chart) ── */
+    .item-list {
+      margin-top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .item-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+    }
+    .item-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .color-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .item-count {
+      font-weight: 700;
+      color: #0052cc;
+      background: #e8f0fe;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading" class="state-msg">
+  <div class="icon">⏳</div>
+  Loading data...
+</div>
+
+<div id="app" style="display:none">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <h1 id="dashboard-title">Recruitment Overview</h1>
+      <div class="subtitle" id="board-name">Loading board...</div>
+    </div>
+    <div class="switcher-wrap">
+      <div class="switcher-row">
+        <select class="switcher" id="job-type-switcher">
+          <option value="open">Open Jobs</option>
+          <option value="closed">Closed Jobs</option>
+          <option value="unassigned">Unassigned Candidates</option>
+          <option value="all">All Job Types</option>
+        </select>
+        <select class="switcher" id="dashboard-switcher">
+          <option value="by-job">Candidates per Job</option>
+          <option value="by-stage">Candidates per Stage</option>
+          <option value="by-job-and-stage">Candidates per Job and Stage</option>
+          <option value="by-member-and-stage">Candidates per Member and Stage</option>
+          <option value="hired-vs-remaining">Hired vs. Remaining</option>
+          <option value="expected-hires">Expected Hires per Month</option>
+          <option value="time-to-hire">Time to Hire</option>
+          <option value="risk-alerts">Risk Alerts</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stat Cards -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="num" id="stat-total">—</div>
+      <div class="label">Total Candidates</div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="stat-groups">—</div>
+      <div class="label" id="stat-groups-label">Groups</div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="stat-avg">—</div>
+      <div class="label">Avg per Group</div>
+    </div>
+  </div>
+
+  <!-- Bar Chart -->
+  <div class="chart-card">
+    <h2 id="chart-title">Chart</h2>
+    <div class="chart-wrapper">
+      <canvas id="myChart"></canvas>
+    </div>
+    <div class="item-list" id="item-list"></div>
+  </div>
+
+</div>
+
+<div id="error" class="state-msg" style="display:none">
+  <div class="icon">⚠️</div>
+  <div id="error-msg">Something went wrong.</div>
+</div>
+
+
+<script>
+/* ============================================
+   HR Dashboard  (installation test)
+   Dashboards:
+   1. Candidates per Job           — groups cards by label
+   2. Candidates per Stage         — groups cards by list name
+   3. Candidates per Job+Stage     — stacked bar by label × list
+   4. Candidates per Member+Stage  — stacked bar by member × list
+   5. Hired vs. Remaining          — grouped bar using custom fields
+   Job type filter applies to all dashboards.
+============================================ */
+
+var EXCLUDED_LISTS = ['clients', 'open jobs', 'closed jobs'];
+
+var COLOURS = [
+  '#0052cc', '#00875a', '#ff5630', '#ff8b00',
+  '#6554c0', '#00b8d9', '#36b37e', '#ff7452',
+  '#172b4d', '#97a0af'
+];
+
+// Trello label color name → hex (current palette: subtle / normal / bold)
+var TRELLO_LABEL_COLOURS = {
+  'green_light':  '#d3f1e0', 'green':        '#4bce97', 'green_dark':   '#1f845a',
+  'yellow_light': '#f9f0c2', 'yellow':       '#f5cd47', 'yellow_dark':  '#946f00',
+  'orange_light': '#ffe8d3', 'orange':       '#fea362', 'orange_dark':  '#c25100',
+  'red_light':    '#ffd5d2', 'red':          '#f87168', 'red_dark':     '#ca3521',
+  'purple_light': '#efe0fb', 'purple':       '#9f8fef', 'purple_dark':  '#6e5dc6',
+  'blue_light':   '#cce0ff', 'blue':         '#579dff', 'blue_dark':    '#0c66e4',
+  'sky_light':    '#c6edfb', 'sky':          '#6cc3e0', 'sky_dark':     '#227d9b',
+  'lime_light':   '#d3f1a7', 'lime':         '#94c748', 'lime_dark':    '#5b7f24',
+  'pink_light':   '#fdd0ec', 'pink':         '#e774bb', 'pink_dark':    '#ae4787',
+  'black_light':  '#dcdfe4', 'black':        '#8590a2', 'black_dark':   '#626f86'
+};
+
+var COLOUR_NO_LABEL   = '#97a0af'; // label exists but has no colour set
+var COLOUR_UNASSIGNED = '#c1c7d0'; // card has no label at all
+
+// ── Stripe pattern helper for Hired vs. Remaining chart ───────────
+function makeStripeCanvas(hexColor, direction) {
+  var size = 8;
+  var pc   = document.createElement('canvas');
+  pc.width = size; pc.height = size;
+  var cx   = pc.getContext('2d');
+  cx.fillStyle = '#ffffff';
+  cx.fillRect(0, 0, size, size);
+  cx.strokeStyle = hexColor;
+  cx.lineWidth   = 2.5;
+  cx.beginPath();
+  if (direction === 'fwd') {
+    cx.moveTo(size,    0);     cx.lineTo(0,      size);
+    cx.moveTo(size*2,  0);     cx.lineTo(0,      size*2);
+    cx.moveTo(size,   -size);  cx.lineTo(-size,  size);
+  } else {
+    cx.moveTo(0,      0);      cx.lineTo(size,   size);
+    cx.moveTo(-size,  0);      cx.lineTo(size,   size*2);
+    cx.moveTo(0,     -size);   cx.lineTo(size*2, size);
+  }
+  cx.stroke();
+  return pc;
+}
+
+var t = window.TrelloPowerUp.iframe({
+  appKey:  'TESTAPIKEY',
+  appName: 'HR Dashboard (installation test)'
+});
+
+// Holds fetched data so switcher doesn't re-fetch
+var appData = null;
+var chartInstance = null;
+
+// ── Filter candidate cards by job type selection ───────────────────
+// openLabelIds  = Set of label IDs found on cards in "Open Jobs" list
+// closedLabelIds = Set of label IDs found on cards in "Closed Jobs" list
+function filterCandidateCards(jobType) {
+  var all = appData.allCandidateCards;
+
+  if (jobType === 'all') return all;
+
+  if (jobType === 'open') {
+    return all.filter(function(card) {
+      return card.labels && card.labels.some(function(l) {
+        return appData.openLabelIds.has(l.id);
+      });
+    });
+  }
+
+  if (jobType === 'closed') {
+    return all.filter(function(card) {
+      return card.labels && card.labels.some(function(l) {
+        return appData.closedLabelIds.has(l.id);
+      });
+    });
+  }
+
+  if (jobType === 'unassigned') {
+    // Cards that have NO label belonging to either open or closed jobs
+    var allJobLabelIds = new Set(
+      Array.from(appData.openLabelIds).concat(Array.from(appData.closedLabelIds))
+    );
+    return all.filter(function(card) {
+      if (!card.labels || card.labels.length === 0) return true;
+      return !card.labels.some(function(l) { return allJobLabelIds.has(l.id); });
+    });
+  }
+
+  return all;
+}
+
+function showError(msg) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display     = 'none';
+  document.getElementById('error').style.display   = 'block';
+  document.getElementById('error-msg').textContent  = msg;
+}
+
+// ── Render a dashboard view given a groups object { name: count } ──
+function renderDashboard(config) {
+  var groupNames  = Object.keys(config.groups);
+  var groupValues = groupNames.map(function(n) { return config.groups[n]; });
+  var total       = config.totalCards;
+  var numGroups   = groupNames.length;
+  var avg         = numGroups > 0 ? (total / numGroups).toFixed(1) : 0;
+
+  // Stats
+  document.getElementById('dashboard-title').textContent   = config.title;
+  document.getElementById('chart-title').textContent       = config.chartTitle;
+  document.getElementById('stat-groups-label').textContent = config.groupsLabel;
+  document.getElementById('stat-total').textContent        = total;
+  document.getElementById('stat-groups').textContent       = numGroups;
+  document.getElementById('stat-avg').textContent          = avg;
+
+  // Colours: use label colours if provided, otherwise fall back to palette
+  var barColours = groupNames.map(function(name, i) {
+    return (config.groupColors && config.groupColors[name])
+      ? config.groupColors[name]
+      : COLOURS[i % COLOURS.length];
+  });
+
+  // Destroy previous chart if exists
+  if (chartInstance) {
+    chartInstance.destroy();
+    chartInstance = null;
+  }
+
+  // Draw chart
+  var ctx = document.getElementById('myChart').getContext('2d');
+  chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: groupNames,
+      datasets: [{
+        label: 'Candidates',
+        data: groupValues,
+        backgroundColor: barColours.map(function(c) { return c + 'cc'; }),
+        borderColor: barColours,
+        borderWidth: 2,
+        borderRadius: 6,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive:          true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              return ' ' + ctx.parsed.y + ' candidate' + (ctx.parsed.y !== 1 ? 's' : '');
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: { stepSize: 1, precision: 0 },
+          grid: { color: '#f0f0f0' }
+        },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  // Build list below chart
+  var listEl = document.getElementById('item-list');
+  listEl.innerHTML = '';
+  groupNames.forEach(function(name, i) {
+    var row = document.createElement('div');
+    row.className = 'item-row';
+    row.innerHTML =
+      '<div class="item-name">' +
+        '<div class="color-dot" style="background:' + barColours[i] + '"></div>' +
+        '<span>' + name + '</span>' +
+      '</div>' +
+      '<span class="item-count">' + config.groups[name] + '</span>';
+    listEl.appendChild(row);
+  });
+
+  t.sizeTo('#app').catch(function() {});
+}
+
+// ── Dashboard: Candidates per Job (grouped by label) ──────────────
+function buildByJob(candidateCards) {
+  var groups      = {};
+  var groupColors = {};
+
+  var jobType = document.getElementById('job-type-switcher').value;
+  var knownLabelIds = [];
+  if (jobType === 'open') {
+    knownLabelIds = Array.from(appData.openLabelIds);
+  } else if (jobType === 'closed') {
+    knownLabelIds = Array.from(appData.closedLabelIds);
+  } else {
+    knownLabelIds = Object.keys(appData.jobLabelNames);
+  }
+  knownLabelIds.forEach(function(id) {
+    var name  = appData.jobLabelNames[id];
+    var color = appData.jobLabelColors[id];
+    if (name) {
+      groups[name]      = 0;
+      groupColors[name] = color ? (TRELLO_LABEL_COLOURS[color] || COLOUR_NO_LABEL) : COLOUR_NO_LABEL;
+    }
+  });
+
+  candidateCards.forEach(function(card) {
+    if (card.labels && card.labels.length > 0) {
+      card.labels.forEach(function(label) {
+        var name  = label.name || ('(no name - ' + label.color + ')');
+        var color = label.color;
+        groups[name] = (groups[name] || 0) + 1;
+        if (!groupColors[name]) {
+          groupColors[name] = color ? (TRELLO_LABEL_COLOURS[color] || COLOUR_NO_LABEL) : COLOUR_NO_LABEL;
+        }
+      });
+    } else {
+      groups['Unassigned']      = (groups['Unassigned'] || 0) + 1;
+      groupColors['Unassigned'] = COLOUR_UNASSIGNED;
+    }
+  });
+
+  return {
+    title:       'Candidates per Job',
+    chartTitle:  'Candidates per Job',
+    groupsLabel: 'Open Jobs',
+    totalCards:  candidateCards.length,
+    groups:      groups,
+    groupColors: groupColors
+  };
+}
+
+// ── Dashboard: Candidates per Stage (grouped by list name) ────────
+function buildByStage(candidateCards, listsMap) {
+  // Pre-initialise every non-excluded list to 0 so empty lists still appear
+  var groups = {};
+  Object.keys(listsMap).forEach(function(id) {
+    groups[listsMap[id]] = 0;
+  });
+  candidateCards.forEach(function(card) {
+    var listName = listsMap[card.idList] || 'Unknown';
+    groups[listName] = (groups[listName] || 0) + 1;
+  });
+  return {
+    title:       'Candidates per Stage',
+    chartTitle:  'Candidates per Stage',
+    groupsLabel: 'Stages',
+    totalCards:  candidateCards.length,
+    groups:      groups
+  };
+}
+
+// ── Dashboard: Candidates per Job and Stage (stacked bar) ─────────
+function buildByJobAndStage(candidateCards, listsMap) {
+  var jobNames   = [];
+  var stageNames = [];
+  var jobSet     = {};
+  var stageSet   = {};
+
+  // Pre-initialize all known job labels from Open+Closed Jobs lists
+  // so jobs with 0 matching candidates still appear
+  var jobType = document.getElementById('job-type-switcher').value;
+  var knownLabelIds = [];
+  if (jobType === 'open') {
+    knownLabelIds = Array.from(appData.openLabelIds);
+  } else if (jobType === 'closed') {
+    knownLabelIds = Array.from(appData.closedLabelIds);
+  } else if (jobType === 'all' || jobType === 'unassigned') {
+    knownLabelIds = Object.keys(appData.jobLabelNames);
+  }
+  knownLabelIds.forEach(function(id) {
+    var name = appData.jobLabelNames[id];
+    if (name && !jobSet[name]) { jobSet[name] = true; jobNames.push(name); }
+  });
+
+  // First pass: collect jobs and stages from actual cards
+  candidateCards.forEach(function(card) {
+    var stageName = listsMap[card.idList] || 'Unknown';
+    if (!stageSet[stageName]) { stageSet[stageName] = true; stageNames.push(stageName); }
+
+    var labels = (card.labels && card.labels.length > 0)
+      ? card.labels
+      : [{ name: 'Unassigned' }];
+
+    labels.forEach(function(label) {
+      var jobName = label.name || ('(no name - ' + label.color + ')');
+      if (!jobSet[jobName]) { jobSet[jobName] = true; jobNames.push(jobName); }
+    });
+  });
+
+  // Also include stages that have 0 cards (from listsMap)
+  Object.values(listsMap).forEach(function(stageName) {
+    if (!stageSet[stageName]) { stageSet[stageName] = true; stageNames.push(stageName); }
+  });
+
+  // Build counts: counts[jobName][stageName] = n
+  var counts = {};
+  jobNames.forEach(function(job) {
+    counts[job] = {};
+    stageNames.forEach(function(stage) { counts[job][stage] = 0; });
+  });
+
+  candidateCards.forEach(function(card) {
+    var stageName = listsMap[card.idList] || 'Unknown';
+    var labels = (card.labels && card.labels.length > 0)
+      ? card.labels
+      : [{ name: 'Unassigned' }];
+    labels.forEach(function(label) {
+      var jobName = label.name || ('(no name - ' + label.color + ')');
+      counts[jobName][stageName] = (counts[jobName][stageName] || 0) + 1;
+    });
+  });
+
+  return {
+    type:        'stacked',
+    title:       'Candidates per Job and Stage',
+    chartTitle:  'Candidates per Job and Stage',
+    totalCards:  candidateCards.length,
+    jobNames:    jobNames,
+    stageNames:  stageNames,
+    counts:      counts,
+    groupsLabel: 'Jobs'
+  };
+}
+
+// ── Dashboard: Candidates per Member and Stage (stacked bar) ──────
+function buildByMemberAndStage(candidateCards, listsMap) {
+  var memberNames = [];
+  var stageNames  = [];
+  var memberSet   = {};
+  var stageSet    = {};
+
+  // Pre-initialize all board members so those with 0 candidates still appear
+  (appData.boardMembers || []).forEach(function(m) {
+    var name = m.fullName || m.username || 'Unassigned';
+    if (!memberSet[name]) { memberSet[name] = true; memberNames.push(name); }
+  });
+
+  // First pass: collect stages and any members not on the board list
+  candidateCards.forEach(function(card) {
+    var stageName = listsMap[card.idList] || 'Unknown';
+    if (!stageSet[stageName]) { stageSet[stageName] = true; stageNames.push(stageName); }
+
+    var members = (card.members && card.members.length > 0)
+      ? card.members
+      : [{ fullName: 'Unassigned' }];
+
+    members.forEach(function(m) {
+      var name = m.fullName || m.username || 'Unassigned';
+      if (!memberSet[name]) { memberSet[name] = true; memberNames.push(name); }
+    });
+  });
+
+  // Include all non-excluded stages even if 0 cards
+  Object.values(listsMap).forEach(function(stageName) {
+    if (!stageSet[stageName]) { stageSet[stageName] = true; stageNames.push(stageName); }
+  });
+
+  // Build counts matrix
+  var counts = {};
+  memberNames.forEach(function(member) {
+    counts[member] = {};
+    stageNames.forEach(function(stage) { counts[member][stage] = 0; });
+  });
+
+  candidateCards.forEach(function(card) {
+    var stageName = listsMap[card.idList] || 'Unknown';
+    var members = (card.members && card.members.length > 0)
+      ? card.members
+      : [{ fullName: 'Unassigned' }];
+    members.forEach(function(m) {
+      var name = m.fullName || m.username || 'Unassigned';
+      counts[name][stageName] = (counts[name][stageName] || 0) + 1;
+    });
+  });
+
+  return {
+    type:        'stacked',
+    title:       'Candidates per Member and Stage',
+    chartTitle:  'Candidates per Member and Stage',
+    totalCards:  candidateCards.length,
+    jobNames:    memberNames,   // reuse jobNames key so renderStackedDashboard works as-is
+    stageNames:  stageNames,
+    counts:      counts,
+    groupsLabel: 'Members'
+  };
+}
+
+
+function renderStackedDashboard(config) {
+  document.getElementById('dashboard-title').textContent   = config.title;
+  document.getElementById('chart-title').textContent       = config.chartTitle;
+  document.getElementById('stat-groups-label').textContent = config.groupsLabel || 'Jobs';
+  document.getElementById('stat-total').textContent        = config.totalCards;
+  document.getElementById('stat-groups').textContent       = config.jobNames.length;
+
+  var totalGroups = config.jobNames.length;
+  var avg = totalGroups > 0 ? (config.totalCards / totalGroups).toFixed(1) : 0;
+  document.getElementById('stat-avg').textContent = avg;
+
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+
+  // One dataset per stage
+  var datasets = config.stageNames.map(function(stage, i) {
+    var colour = COLOURS[i % COLOURS.length];
+    return {
+      label:           stage,
+      data:            config.jobNames.map(function(job) { return config.counts[job][stage] || 0; }),
+      backgroundColor: colour + 'cc',
+      borderColor:     colour,
+      borderWidth:     2,
+      borderRadius:    0,
+      borderSkipped:   false
+    };
+  });
+
+  var ctx = document.getElementById('myChart').getContext('2d');
+  chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels:   config.jobNames,
+      datasets: datasets
+    },
+    options: {
+      responsive:          true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display:  true,
+          position: 'bottom',
+          labels:   { boxWidth: 12, font: { size: 11 } }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              return ' ' + ctx.dataset.label + ': ' + ctx.parsed.y +
+                ' candidate' + (ctx.parsed.y !== 1 ? 's' : '');
+            }
+          }
+        }
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false } },
+        y: {
+          stacked: true,
+          beginAtZero: true,
+          ticks: { stepSize: 1, precision: 0 },
+          grid:  { color: '#f0f0f0' }
+        }
+      }
+    }
+  });
+
+  // Build legend table: jobs as rows, stages as columns
+  var listEl = document.getElementById('item-list');
+  listEl.innerHTML = '';
+
+  var table = document.createElement('table');
+  table.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;';
+
+  // Header row: empty corner + one column per stage
+  var thead = document.createElement('thead');
+  var headRow = document.createElement('tr');
+
+  var cornerTh = document.createElement('th');
+  cornerTh.style.cssText = 'text-align:left;padding:6px 8px;border-bottom:2px solid #dfe1e6;color:#6b778c;font-weight:600;white-space:nowrap;';
+  cornerTh.textContent = (config.groupsLabel || 'Job') + ' / Stage';
+  headRow.appendChild(cornerTh);
+
+  config.stageNames.forEach(function(stage, i) {
+    var th = document.createElement('th');
+    var colour = COLOURS[i % COLOURS.length];
+    th.style.cssText = 'text-align:center;padding:6px 8px;border-bottom:2px solid ' + colour + ';color:' + colour + ';font-weight:600;white-space:nowrap;';
+    th.textContent = stage;
+    headRow.appendChild(th);
+  });
+
+  // Total column header
+  var totalTh = document.createElement('th');
+  totalTh.style.cssText = 'text-align:center;padding:6px 8px;border-bottom:2px solid #172b4d;color:#172b4d;font-weight:600;';
+  totalTh.textContent = 'Total';
+  headRow.appendChild(totalTh);
+
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  // Body rows: one per job
+  var tbody = document.createElement('tbody');
+  config.jobNames.forEach(function(job, rowIdx) {
+    var tr = document.createElement('tr');
+    tr.style.background = rowIdx % 2 === 0 ? '#f8f9fc' : '#ffffff';
+
+    var jobTd = document.createElement('td');
+    jobTd.style.cssText = 'padding:6px 8px;font-weight:600;color:#172b4d;white-space:nowrap;border-bottom:1px solid #f0f0f0;';
+    jobTd.textContent = job;
+    tr.appendChild(jobTd);
+
+    var jobTotal = 0;
+    config.stageNames.forEach(function(stage, i) {
+      var count = config.counts[job][stage] || 0;
+      jobTotal += count;
+      var td = document.createElement('td');
+      td.style.cssText = 'text-align:center;padding:6px 8px;border-bottom:1px solid #f0f0f0;color:' + (count > 0 ? '#172b4d' : '#c1c7d0') + ';';
+      td.textContent = count > 0 ? count : '—';
+      tr.appendChild(td);
+    });
+
+    // Total cell
+    var totalTd = document.createElement('td');
+    totalTd.style.cssText = 'text-align:center;padding:6px 8px;border-bottom:1px solid #f0f0f0;font-weight:700;color:#0052cc;background:#e8f0fe;';
+    totalTd.textContent = jobTotal;
+    tr.appendChild(totalTd);
+
+    tbody.appendChild(tr);
+  });
+
+  // Footer row: totals per stage
+  var footRow = document.createElement('tr');
+  footRow.style.background = '#f0f0f0';
+
+  var footLabelTd = document.createElement('td');
+  footLabelTd.style.cssText = 'padding:6px 8px;font-weight:700;color:#172b4d;border-top:2px solid #dfe1e6;';
+  footLabelTd.textContent = 'Total';
+  footRow.appendChild(footLabelTd);
+
+  var grandTotal = 0;
+  config.stageNames.forEach(function(stage) {
+    var stageTotal = config.jobNames.reduce(function(sum, job) {
+      return sum + (config.counts[job][stage] || 0);
+    }, 0);
+    grandTotal += stageTotal;
+    var td = document.createElement('td');
+    td.style.cssText = 'text-align:center;padding:6px 8px;font-weight:700;color:#172b4d;border-top:2px solid #dfe1e6;';
+    td.textContent = stageTotal;
+    footRow.appendChild(td);
+  });
+
+  var grandTd = document.createElement('td');
+  grandTd.style.cssText = 'text-align:center;padding:6px 8px;font-weight:800;color:#0052cc;background:#e8f0fe;border-top:2px solid #dfe1e6;';
+  grandTd.textContent = grandTotal;
+  footRow.appendChild(grandTd);
+
+  tbody.appendChild(footRow);
+  table.appendChild(tbody);
+  listEl.appendChild(table);
+
+  t.sizeTo('#app').catch(function() {});
+}
+
+
+// ── Dashboard 5: Hired vs. Remaining ──────────────────────────────
+function renderHiredVsRemaining() {
+  var jobType = document.getElementById('job-type-switcher').value;
+  var knownLabelIds = [];
+  if (jobType === 'open') {
+    knownLabelIds = Array.from(appData.openLabelIds);
+  } else if (jobType === 'closed') {
+    knownLabelIds = Array.from(appData.closedLabelIds);
+  } else {
+    knownLabelIds = Object.keys(appData.jobLabelNames);
+  }
+
+  var jobNames  = [];
+  var jobColors = {};
+  var seen      = {};
+  knownLabelIds.forEach(function(id) {
+    var name  = appData.jobLabelNames[id];
+    var color = appData.jobLabelColors[id];
+    if (name && !seen[name]) {
+      seen[name]     = true;
+      jobNames.push(name);
+      jobColors[name] = color ? (TRELLO_LABEL_COLOURS[color] || COLOUR_NO_LABEL) : COLOUR_NO_LABEL;
+    }
+  });
+
+  document.getElementById('dashboard-title').textContent   = 'Hired vs. Remaining';
+  document.getElementById('chart-title').textContent       = 'Hired vs. Remaining per Job';
+  document.getElementById('stat-groups-label').textContent = 'Jobs';
+  document.getElementById('stat-groups').textContent       = jobNames.length;
+  document.getElementById('stat-avg').textContent          = '—';
+  document.getElementById('stat-total').textContent        = '—';
+
+  var listEl = document.getElementById('item-list');
+  listEl.innerHTML = '';
+
+  if (!appData.restApiAuthorized) {
+    if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+    document.getElementById('chart-title').textContent = '';
+    listEl.innerHTML =
+      '<div style="text-align:center;padding:40px 20px;color:#6b778c;font-size:13px;">' +
+      '🔑 This dashboard requires authorization.<br><br>' +
+      'Click the ⚙️ gear icon on the HR Dashboard (installation test) Power-Up and select <strong>Authorize Account</strong>.' +
+      '</div>';
+    t.sizeTo('#app').catch(function() {});
+    return;
+  }
+
+  if (!appData.customFieldsReady) {
+    listEl.innerHTML = '<div style="text-align:center;padding:40px 20px;color:#6b778c;font-size:13px;">⏳ Loading custom field data…</div>';
+    t.sizeTo('#app').catch(function() {});
+    return;
+  }
+
+  var cfData    = appData.customFieldData;
+  var totals    = jobNames.map(function(n) { return cfData[n] ? (cfData[n].total     || 0) : 0; });
+  var hired     = jobNames.map(function(n) { return cfData[n] ? (cfData[n].hired     || 0) : 0; });
+  var remaining = jobNames.map(function(n) { return cfData[n] ? (cfData[n].remaining || 0) : 0; });
+
+  var grandTotal = totals.reduce(function(s, v) { return s + v; }, 0);
+  document.getElementById('stat-total').textContent = grandTotal;
+
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+  var chartCtx = document.getElementById('myChart').getContext('2d');
+
+  var hiredBg = jobNames.map(function(n) {
+    return chartCtx.createPattern(makeStripeCanvas(jobColors[n], 'fwd'), 'repeat');
+  });
+  var remainingBg = jobNames.map(function(n) {
+    return chartCtx.createPattern(makeStripeCanvas(jobColors[n], 'back'), 'repeat');
+  });
+  var borderColors = jobNames.map(function(n) { return jobColors[n]; });
+
+  chartInstance = new Chart(chartCtx, {
+    type: 'bar',
+    data: {
+      labels: jobNames,
+      datasets: [
+        { label: 'Total',     data: totals,    backgroundColor: borderColors, borderColor: borderColors, borderWidth: 2, borderRadius: 4, borderSkipped: false },
+        { label: 'Hired',     data: hired,     backgroundColor: hiredBg,      borderColor: borderColors, borderWidth: 2, borderRadius: 4, borderSkipped: false },
+        { label: 'Remaining', data: remaining, backgroundColor: remainingBg,  borderColor: borderColors, borderWidth: 2, borderRadius: 4, borderSkipped: false }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true, position: 'bottom', labels: { boxWidth: 14, font: { size: 11 } } },
+        tooltip: { callbacks: { label: function(ctx) { return ' ' + ctx.dataset.label + ': ' + ctx.parsed.y; } } }
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { color: '#f0f0f0' } }
+      }
+    }
+  });
+
+  // Summary table
+  var table = document.createElement('table');
+  table.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px;margin-top:16px;';
+  var thead = document.createElement('thead');
+  var headRow = document.createElement('tr');
+  [['Job','left'],['Total','center'],['Hired','center'],['Remaining','center']].forEach(function(col) {
+    var th = document.createElement('th');
+    th.style.cssText = 'text-align:' + col[1] + ';padding:6px 8px;border-bottom:2px solid #dfe1e6;color:#6b778c;font-weight:600;';
+    th.textContent = col[0];
+    headRow.appendChild(th);
+  });
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+  var tbody = document.createElement('tbody');
+  jobNames.forEach(function(name, i) {
+    var tr = document.createElement('tr');
+    tr.style.background = i % 2 === 0 ? '#f8f9fc' : '#ffffff';
+    var dot = '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + jobColors[name] + ';margin-right:6px;vertical-align:middle;"></span>';
+    [[dot + name,'left',true],[totals[i],'center',false],[hired[i],'center',false],[remaining[i],'center',false]].forEach(function(cell) {
+      var td = document.createElement('td');
+      td.style.cssText = 'padding:6px 8px;border-bottom:1px solid #f0f0f0;text-align:' + cell[1] + ';';
+      if (cell[2]) { td.innerHTML = cell[0]; } else { td.textContent = cell[0]; }
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  listEl.appendChild(table);
+  t.sizeTo('#app').catch(function() {});
+}
+
+// ── Time to Hire ──────────────────────────────────────────────────
+function renderTimeToHire() {
+  var canvas = document.getElementById('myChart');
+  var listEl = document.getElementById('item-list');
+  var ctx    = canvas.getContext('2d');
+
+  // Clear previous chart
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+  listEl.innerHTML = '';
+
+  // Update header stats/titles
+  document.getElementById('dashboard-title').textContent   = 'Time to Hire';
+  document.getElementById('chart-title').textContent       = 'Days from Published Candidates → Hire';
+  document.getElementById('stat-groups-label').textContent = 'Jobs';
+  document.getElementById('stat-total').textContent        = '—';
+  document.getElementById('stat-groups').textContent       = '—';
+  document.getElementById('stat-avg').textContent          = '—';
+
+  if (!appData.restApiAuthorized) {
+    listEl.innerHTML = '<p style="padding:20px;color:#6b778c;">This dashboard requires authorization.<br>Click the ⚙️ gear icon on the HR Dashboard (installation test) Power-Up and select <strong>Authorize Account</strong>.</p>';
+    t.sizeTo('#app').catch(function() {});
+    return;
+  }
+  if (!appData.timeToHireReady) {
+    listEl.innerHTML = '<p style="padding:20px;color:#6b778c;">⏳ Loading time to hire data…</p>';
+    t.sizeTo('#app').catch(function() {});
+    return;
+  }
+
+  var jobType = document.getElementById('job-type-switcher').value;
+  var allTth  = appData.timeToHireData;
+  var data = allTth.filter(function(d) {
+    if (jobType === 'all') return true;
+    if (jobType === 'open')       return d.labelId && appData.openLabelIds.has(d.labelId);
+    if (jobType === 'closed')     return d.labelId && appData.closedLabelIds.has(d.labelId);
+    if (jobType === 'unassigned') return !d.labelId || (!appData.openLabelIds.has(d.labelId) && !appData.closedLabelIds.has(d.labelId));
+    return true;
+  });
+
+  if (!data || data.length === 0) {
+    listEl.innerHTML = '<p style="padding:20px;color:#6b778c;">No hired candidates found. Make sure cards have been moved through "Published Candidates" and then "Hire".</p>';
+    t.sizeTo('#app').catch(function() {});
+    return;
+  }
+
+  // Collect unique job names sorted
+  var jobOrder = [];
+  data.forEach(function(d) { if (jobOrder.indexOf(d.job) === -1) jobOrder.push(d.job); });
+  jobOrder.sort();
+
+  // Beeswarm layout
+  var radius = 0.18;
+  var allPoints = [];
+  jobOrder.forEach(function(job, ji) {
+    var jobPoints = data
+      .filter(function(d) { return d.job === job; })
+      .map(function(d) { return { baseX: ji, y: d.days, label: d.candidate, color: d.color, job: d.job }; });
+    jobPoints.sort(function(a, b) { return a.y - b.y; });
+    var placed = [];
+    jobPoints.forEach(function(p) {
+      var bestX = p.baseX, found = false;
+      for (var step = 0; step <= 20 && !found; step++) {
+        var cands = step === 0 ? [p.baseX] : [p.baseX + step * radius, p.baseX - step * radius];
+        for (var ci = 0; ci < cands.length && !found; ci++) {
+          var tx = cands[ci];
+          var ok = placed.every(function(q) {
+            var dx = tx - q.x, dy = p.y - q.y;
+            return Math.sqrt(dx*dx + dy*dy) >= radius;
+          });
+          if (ok) { bestX = tx; found = true; }
+        }
+      }
+      placed.push({ x: bestX, y: p.y });
+      allPoints.push({ x: bestX, y: p.y, label: p.label, color: p.color, job: p.job });
+    });
+  });
+
+  // Group points by color for datasets
+  var colorMap = {};
+  allPoints.forEach(function(p) {
+    if (!colorMap[p.color]) colorMap[p.color] = [];
+    colorMap[p.color].push(p);
+  });
+  var datasets = Object.keys(colorMap).map(function(color) {
+    return {
+      data: colorMap[color].map(function(p) { return { x: p.x, y: p.y, label: p.label, job: p.job }; }),
+      backgroundColor: color,
+      borderColor: color,
+      pointRadius: 7,
+      pointHoverRadius: 9,
+      showLine: false
+    };
+  });
+
+  // Update stats
+  var avgDays = Math.round(data.reduce(function(s, d) { return s + d.days; }, 0) / data.length);
+  document.getElementById('stat-total').textContent  = data.length;
+  document.getElementById('stat-groups').textContent = jobOrder.length;
+  document.getElementById('stat-avg').textContent    = avgDays + 'd';
+
+  chartInstance = new Chart(ctx, {
+    type: 'scatter',
+    data: { datasets: datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: function() { return ''; },
+            label: function(ctx) {
+              var r = ctx.raw;
+              return r.label + ' (' + r.job + '): ' + r.y + ' days';
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          min: -0.8,
+          max: jobOrder.length - 0.2,
+          ticks: {
+            stepSize: 1,
+            callback: function(val) {
+              var i = Math.round(val);
+              if (Math.abs(val - i) < 0.01 && jobOrder[i] !== undefined) {
+                var name = jobOrder[i];
+                return name.length > 14 ? name.substring(0, 13) + '…' : name;
+              }
+              return '';
+            },
+            maxRotation: 30,
+            font: { size: 11 }
+          },
+          grid: { display: false }
+        },
+        y: {
+          title: { display: true, text: 'Days to Hire', font: { size: 12 } },
+          beginAtZero: true,
+          ticks: { font: { size: 11 } }
+        }
+      }
+    }
+  });
+
+  // ── Table ──
+  var table = document.createElement('table');
+  table.style.cssText = 'width:100%;border-collapse:collapse;margin-top:16px;font-size:12px;';
+  var thead = document.createElement('thead');
+  thead.innerHTML = '<tr style="background:#f4f5f7;">' +
+    '<th style="padding:8px 10px;text-align:left;border-bottom:2px solid #dfe1e6;">Job</th>' +
+    '<th style="padding:8px 10px;text-align:left;border-bottom:2px solid #dfe1e6;">Candidate</th>' +
+    '<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #dfe1e6;">Days to Hire</th>' +
+    '</tr>';
+  table.appendChild(thead);
+
+  var tbody = document.createElement('tbody');
+  // Sort by job then days
+  var sorted = data.slice().sort(function(a, b) {
+    return a.job < b.job ? -1 : a.job > b.job ? 1 : a.days - b.days;
+  });
+  sorted.forEach(function(row, i) {
+    var tr = document.createElement('tr');
+    tr.style.background = i % 2 === 0 ? '#fff' : '#f9fafb';
+    var dot = '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + row.color + ';margin-right:6px;vertical-align:middle;"></span>';
+    tr.innerHTML =
+      '<td style="padding:7px 10px;border-bottom:1px solid #f0f0f0;">' + dot + escHtml(row.job) + '</td>' +
+      '<td style="padding:7px 10px;border-bottom:1px solid #f0f0f0;">' + escHtml(row.candidate) + '</td>' +
+      '<td style="padding:7px 10px;border-bottom:1px solid #f0f0f0;text-align:right;">' + row.days + '</td>';
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  listEl.appendChild(table);
+  t.sizeTo('#app').catch(function() {});
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Expected Hires per Month ──────────────────────────────────────
+function renderExpectedHires() {
+  var canvas = document.getElementById('myChart');
+  var listEl = document.getElementById('item-list');
+  var ctx    = canvas.getContext('2d');
+
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+  listEl.innerHTML = '';
+
+  document.getElementById('dashboard-title').textContent   = 'Expected Hires per Month';
+  document.getElementById('chart-title').textContent       = 'Expected Hires per Month per Job';
+  document.getElementById('stat-groups-label').textContent = 'Jobs';
+  document.getElementById('stat-total').textContent        = '—';
+  document.getElementById('stat-groups').textContent       = '—';
+  document.getElementById('stat-avg').textContent          = '—';
+
+  if (!appData.restApiAuthorized) {
+    listEl.innerHTML = '<p style="padding:20px;color:#6b778c;">This dashboard requires authorization.<br>Click the ⚙️ gear icon on the HR Dashboard (installation test) Power-Up and select <strong>Authorize Account</strong>.</p>';
+    t.sizeTo('#app').catch(function() {});
+    return;
+  }
+  if (!appData.customFieldsReady) {
+    listEl.innerHTML = '<p style="padding:20px;color:#6b778c;">⏳ Loading custom fields data…</p>';
+    t.sizeTo('#app').catch(function() {});
+    return;
+  }
+
+  var jobType = document.getElementById('job-type-switcher').value;
+
+  // Pick which label IDs to include
+  var knownLabelIds = [];
+  if (jobType === 'open') {
+    knownLabelIds = Array.from(appData.openLabelIds);
+  } else if (jobType === 'closed') {
+    knownLabelIds = Array.from(appData.closedLabelIds);
+  } else {
+    knownLabelIds = Object.keys(appData.jobLabelNames);
+  }
+
+  // Days until end of year
+  var now     = new Date();
+  var endYear = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+  var daysLeft = Math.max(1, Math.round((endYear - now) / (1000 * 60 * 60 * 24)));
+  var DAYS_PER_MONTH = 30.417;
+
+  // Build per-job data
+  var jobNames  = [];
+  var jobValues = {};
+  var jobColors = {};
+  var seen      = {};
+
+  knownLabelIds.forEach(function(id) {
+    var name  = appData.jobLabelNames[id];
+    var color = appData.jobLabelColors[id];
+    if (!name || seen[name]) return;
+    seen[name] = true;
+
+    var cf        = appData.customFieldData[name] || {};
+    var remaining = cf.remaining !== null && cf.remaining !== undefined ? cf.remaining : 0;
+    var velocity  = Math.round((remaining / daysLeft * DAYS_PER_MONTH) * 10) / 10; // 1 decimal
+
+    jobNames.push(name);
+    jobValues[name] = velocity;
+    jobColors[name] = color ? (TRELLO_LABEL_COLOURS[color] || COLOUR_NO_LABEL) : COLOUR_NO_LABEL;
+  });
+
+  // Sort by velocity descending
+  jobNames.sort(function(a, b) { return jobValues[b] - jobValues[a]; });
+
+  var totalExpected = jobNames.reduce(function(s, n) { return s + jobValues[n]; }, 0);
+  totalExpected = Math.round(totalExpected * 10) / 10;
+
+  document.getElementById('stat-total').textContent  = totalExpected;
+  document.getElementById('stat-groups').textContent = jobNames.length;
+  document.getElementById('stat-avg').textContent    = jobNames.length
+    ? Math.round(totalExpected / jobNames.length * 10) / 10
+    : '—';
+
+  if (jobNames.length === 0) {
+    listEl.innerHTML = '<p style="padding:20px;color:#6b778c;">No job data found. Make sure job cards have a "Remaining" custom field.</p>';
+    t.sizeTo('#app').catch(function() {});
+    return;
+  }
+
+  chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: jobNames,
+      datasets: [{
+        data:            jobNames.map(function(n) { return jobValues[n]; }),
+        backgroundColor: jobNames.map(function(n) { return jobColors[n]; }),
+        borderColor:     jobNames.map(function(n) { return jobColors[n]; }),
+        borderWidth: 1,
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              return ctx.parsed.y + ' hires/month';
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            font: { size: 11 },
+            maxRotation: 30,
+            callback: function(val, i) {
+              var name = jobNames[i] || '';
+              return name.length > 16 ? name.substring(0, 15) + '…' : name;
+            }
+          },
+          grid: { display: false }
+        },
+        y: {
+          title: { display: true, text: 'Expected Hires / Month', font: { size: 12 } },
+          beginAtZero: true,
+          ticks: { font: { size: 11 } }
+        }
+      }
+    }
+  });
+
+  // ── Table ──
+  var table = document.createElement('table');
+  table.style.cssText = 'width:100%;border-collapse:collapse;margin-top:16px;font-size:12px;';
+  var thead = document.createElement('thead');
+  thead.innerHTML =
+    '<tr style="background:#f4f5f7;">' +
+    '<th style="padding:8px 10px;text-align:left;border-bottom:2px solid #dfe1e6;">Job</th>' +
+    '<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #dfe1e6;">Remaining</th>' +
+    '<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #dfe1e6;">Days Left in Year</th>' +
+    '<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #dfe1e6;">Expected Hires / Month</th>' +
+    '</tr>';
+  table.appendChild(thead);
+  var tbody = document.createElement('tbody');
+  jobNames.forEach(function(name, i) {
+    var cf        = appData.customFieldData[name] || {};
+    var remaining = cf.remaining !== null && cf.remaining !== undefined ? cf.remaining : 0;
+    var tr = document.createElement('tr');
+    tr.style.background = i % 2 === 0 ? '#fff' : '#f9fafb';
+    var dot = '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + jobColors[name] + ';margin-right:6px;vertical-align:middle;"></span>';
+    tr.innerHTML =
+      '<td style="padding:7px 10px;border-bottom:1px solid #f0f0f0;">' + dot + escHtml(name) + '</td>' +
+      '<td style="padding:7px 10px;border-bottom:1px solid #f0f0f0;text-align:right;">' + remaining + '</td>' +
+      '<td style="padding:7px 10px;border-bottom:1px solid #f0f0f0;text-align:right;">' + daysLeft + '</td>' +
+      '<td style="padding:7px 10px;border-bottom:1px solid #f0f0f0;text-align:right;font-weight:600;">' + jobValues[name] + '</td>';
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  listEl.appendChild(table);
+  t.sizeTo('#app').catch(function() {});
+}
+
+// ── Risk Alerts ───────────────────────────────────────────────────
+function renderRiskAlerts() {
+  var canvas = document.getElementById('myChart');
+  var listEl = document.getElementById('item-list');
+  var ctx    = canvas.getContext('2d');
+
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+  listEl.innerHTML = '';
+
+  document.getElementById('dashboard-title').textContent   = 'Risk Alerts';
+  document.getElementById('chart-title').textContent       = 'Days in Pipeline per Stage';
+  document.getElementById('stat-groups-label').textContent = 'Stages';
+  document.getElementById('stat-total').textContent        = '—';
+  document.getElementById('stat-groups').textContent       = '—';
+  document.getElementById('stat-avg').textContent          = '—';
+
+  if (!appData.restApiAuthorized) {
+    listEl.innerHTML = '<p style="padding:20px;color:#6b778c;">This dashboard requires authorization.<br>Click the ⚙️ gear icon on the HR Dashboard (installation test) Power-Up and select <strong>Authorize Account</strong>.</p>';
+    t.sizeTo('#app').catch(function() {});
+    return;
+  }
+  if (!appData.riskAlertsReady) {
+    listEl.innerHTML = '<p style="padding:20px;color:#6b778c;">⏳ Loading pipeline data…</p>';
+    t.sizeTo('#app').catch(function() {});
+    return;
+  }
+
+  var jobType = document.getElementById('job-type-switcher').value;
+  var data = appData.riskAlertsData.filter(function(d) {
+    if (jobType === 'all') return true;
+    if (jobType === 'open')       return d.labelId && appData.openLabelIds.has(d.labelId);
+    if (jobType === 'closed')     return d.labelId && appData.closedLabelIds.has(d.labelId);
+    if (jobType === 'unassigned') return !d.labelId || (!appData.openLabelIds.has(d.labelId) && !appData.closedLabelIds.has(d.labelId));
+    return true;
+  });
+
+  if (!data || data.length === 0) {
+    listEl.innerHTML = '<p style="padding:20px;color:#6b778c;">No candidates currently in the pipeline.</p>';
+    t.sizeTo('#app').catch(function() {});
+    return;
+  }
+
+  // Stage order = board list order (from riskAlertsStages)
+  var stageOrder = appData.riskAlertsStages;
+
+  // Beeswarm layout
+  var radius = 0.18;
+  var allPoints = [];
+
+  stageOrder.forEach(function(stage, si) {
+    var stagePoints = data
+      .filter(function(d) { return d.stage === stage; })
+      .map(function(d) { return { baseX: si, y: d.days, label: d.candidate, color: d.color, job: d.job, lastAction: d.lastAction }; });
+    stagePoints.sort(function(a, b) { return a.y - b.y; });
+
+    var placed = [];
+    stagePoints.forEach(function(p) {
+      var bestX = p.baseX, found = false;
+      for (var step = 0; step <= 20 && !found; step++) {
+        var cands = step === 0 ? [p.baseX] : [p.baseX + step * radius, p.baseX - step * radius];
+        for (var ci = 0; ci < cands.length && !found; ci++) {
+          var tx = cands[ci];
+          var ok = placed.every(function(q) {
+            var dx = tx - q.x, dy = p.y - q.y;
+            return Math.sqrt(dx*dx + dy*dy) >= radius;
+          });
+          if (ok) { bestX = tx; found = true; }
+        }
+      }
+      placed.push({ x: bestX, y: p.y });
+      allPoints.push({ x: bestX, y: p.y, label: p.label, color: p.color, job: p.job, lastAction: p.lastAction });
+    });
+  });
+
+  // Group by color for Chart.js datasets
+  var colorMap = {};
+  allPoints.forEach(function(p) {
+    if (!colorMap[p.color]) colorMap[p.color] = [];
+    colorMap[p.color].push(p);
+  });
+  var datasets = Object.keys(colorMap).map(function(color) {
+    return {
+      data: colorMap[color].map(function(p) {
+        return { x: p.x, y: p.y, label: p.label, job: p.job, lastAction: p.lastAction };
+      }),
+      backgroundColor: color,
+      borderColor: color,
+      pointRadius: 7,
+      pointHoverRadius: 9,
+      showLine: false
+    };
+  });
+
+  // Update stats
+  var avgDays = Math.round(data.reduce(function(s, d) { return s + d.days; }, 0) / data.length);
+  document.getElementById('stat-total').textContent  = data.length;
+  document.getElementById('stat-groups').textContent = stageOrder.length;
+  document.getElementById('stat-avg').textContent    = avgDays + 'd';
+
+  chartInstance = new Chart(ctx, {
+    type: 'scatter',
+    data: { datasets: datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: function() { return ''; },
+            label: function(ctx) {
+              var r = ctx.raw;
+              return [
+                r.job + ' — ' + r.label,
+                'Days in pipeline: ' + r.y,
+                'Last action: ' + r.lastAction
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          min: -0.8,
+          max: stageOrder.length - 0.2,
+          ticks: {
+            stepSize: 1,
+            callback: function(val) {
+              var i = Math.round(val);
+              if (Math.abs(val - i) < 0.01 && stageOrder[i] !== undefined) {
+                var name = stageOrder[i];
+                return name.length > 14 ? name.substring(0, 13) + '…' : name;
+              }
+              return '';
+            },
+            maxRotation: 30,
+            font: { size: 11 }
+          },
+          grid: { display: false }
+        },
+        y: {
+          title: { display: true, text: 'Days in Pipeline', font: { size: 12 } },
+          beginAtZero: true,
+          ticks: { font: { size: 11 } }
+        }
+      }
+    }
+  });
+
+  // ── Table ──
+  var table = document.createElement('table');
+  table.style.cssText = 'width:100%;border-collapse:collapse;margin-top:16px;font-size:12px;';
+  var thead = document.createElement('thead');
+  thead.innerHTML =
+    '<tr style="background:#f4f5f7;">' +
+    '<th style="padding:8px 10px;text-align:left;border-bottom:2px solid #dfe1e6;">Job</th>' +
+    '<th style="padding:8px 10px;text-align:left;border-bottom:2px solid #dfe1e6;">Candidate</th>' +
+    '<th style="padding:8px 10px;text-align:left;border-bottom:2px solid #dfe1e6;">Stage</th>' +
+    '<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #dfe1e6;">Days in Pipeline</th>' +
+    '<th style="padding:8px 10px;text-align:left;border-bottom:2px solid #dfe1e6;">Last Action</th>' +
+    '</tr>';
+  table.appendChild(thead);
+
+  var tbody = document.createElement('tbody');
+  // Sort by days descending (most at-risk first)
+  var sorted = data.slice().sort(function(a, b) { return b.days - a.days; });
+  sorted.forEach(function(row, i) {
+    var tr = document.createElement('tr');
+    tr.style.background = i % 2 === 0 ? '#fff' : '#f9fafb';
+    var dot = '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + row.color + ';margin-right:6px;vertical-align:middle;"></span>';
+    // Highlight rows with >30 days in pipeline
+    if (row.days > 30) tr.style.background = i % 2 === 0 ? '#fff8f0' : '#fff3e6';
+    tr.innerHTML =
+      '<td style="padding:7px 10px;border-bottom:1px solid #f0f0f0;">' + dot + escHtml(row.job) + '</td>' +
+      '<td style="padding:7px 10px;border-bottom:1px solid #f0f0f0;">' + escHtml(row.candidate) + '</td>' +
+      '<td style="padding:7px 10px;border-bottom:1px solid #f0f0f0;">' + escHtml(row.stage) + '</td>' +
+      '<td style="padding:7px 10px;border-bottom:1px solid #f0f0f0;text-align:right;' + (row.days > 30 ? 'color:#ca3521;font-weight:600;' : '') + '">' + row.days + '</td>' +
+      '<td style="padding:7px 10px;border-bottom:1px solid #f0f0f0;color:#6b778c;">' + escHtml(row.lastAction) + '</td>';
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  listEl.appendChild(table);
+  t.sizeTo('#app').catch(function() {});
+}
+
+function switchDashboard(view, jobType) {
+  if (!appData) return;
+
+  // Hide "Unassigned Candidates" for job-level dashboards
+  var noUnassignedViews = ['hired-vs-remaining', 'expected-hires'];
+  var unassignedOpt = document.querySelector('#job-type-switcher option[value="unassigned"]');
+  if (unassignedOpt) {
+    unassignedOpt.hidden = noUnassignedViews.indexOf(view) !== -1;
+  }
+  // If currently selected jobType is unassigned but it's now hidden, fall back to 'open'
+  jobType = jobType || document.getElementById('job-type-switcher').value;
+  if (jobType === 'unassigned' && noUnassignedViews.indexOf(view) !== -1) {
+    document.getElementById('job-type-switcher').value = 'open';
+    jobType = 'open';
+  }
+
+  if (view === 'hired-vs-remaining') {
+    renderHiredVsRemaining();
+    return;
+  }
+  if (view === 'expected-hires') {
+    renderExpectedHires();
+    return;
+  }
+  if (view === 'time-to-hire') {
+    renderTimeToHire();
+    return;
+  }
+  if (view === 'risk-alerts') {
+    renderRiskAlerts();
+    return;
+  }
+  var cards = filterCandidateCards(jobType);
+  if (view === 'by-job-and-stage') {
+    renderStackedDashboard(buildByJobAndStage(cards, appData.listsMap));
+  } else if (view === 'by-member-and-stage') {
+    renderStackedDashboard(buildByMemberAndStage(cards, appData.listsMap));
+  } else if (view === 'by-stage') {
+    renderDashboard(buildByStage(cards, appData.listsMap));
+  } else {
+    renderDashboard(buildByJob(cards));
+  }
+}
+
+document.getElementById('dashboard-switcher').addEventListener('change', function() {
+  switchDashboard(this.value);
+});
+
+document.getElementById('job-type-switcher').addEventListener('change', function() {
+  switchDashboard(document.getElementById('dashboard-switcher').value, this.value);
+});
+
+// ── Main ───────────────────────────────────────────────────────────
+t.render(function() {
+  Promise.all([
+    t.board('id', 'name', 'members'),
+    t.lists('id', 'name'),
+    t.cards('id', 'name', 'labels', 'idList', 'members')
+  ])
+  .then(function(results) {
+    var board    = results[0];
+    var lists    = results[1];
+    var allCards = results[2];
+
+    document.getElementById('board-name').textContent = board.name;
+
+    var excludedIds = new Set(
+      lists.filter(function(l) { return EXCLUDED_LISTS.indexOf(l.name.trim().toLowerCase()) !== -1; })
+           .map(function(l) { return l.id; })
+    );
+
+    var openJobsList   = lists.find(function(l) { return l.name.trim().toLowerCase() === 'open jobs'; });
+    var closedJobsList = lists.find(function(l) { return l.name.trim().toLowerCase() === 'closed jobs'; });
+
+    var openLabelIds   = new Set();
+    var closedLabelIds = new Set();
+    var jobLabelNames  = {};
+    var jobLabelColors = {};
+
+    function collectLabels(card, targetSet) {
+      (card.labels || []).forEach(function(l) {
+        targetSet.add(l.id);
+        jobLabelNames[l.id]  = l.name || ('(no name - ' + l.color + ')');
+        jobLabelColors[l.id] = l.color || null;
+      });
+    }
+
+    if (openJobsList)   allCards.filter(function(c) { return c.idList === openJobsList.id; }).forEach(function(c) { collectLabels(c, openLabelIds); });
+    if (closedJobsList) allCards.filter(function(c) { return c.idList === closedJobsList.id; }).forEach(function(c) { collectLabels(c, closedLabelIds); });
+
+    var listsMap = {};
+    lists.forEach(function(l) { if (!excludedIds.has(l.id)) listsMap[l.id] = l.name; });
+
+    var allCandidateCards = allCards.filter(function(c) { return !excludedIds.has(c.idList); });
+
+    appData = {
+      allCandidateCards:  allCandidateCards,
+      listsMap:           listsMap,
+      openLabelIds:       openLabelIds,
+      closedLabelIds:     closedLabelIds,
+      jobLabelNames:      jobLabelNames,
+      jobLabelColors:     jobLabelColors,
+      boardMembers:       board.members || [],
+      restApiAuthorized:  false,
+      customFieldsReady:  false,
+      customFieldData:    {},
+      timeToHireReady:    false,
+      timeToHireData:     [],
+      riskAlertsReady:    false,
+      riskAlertsData:     [],
+      riskAlertsStages:   []
+    };
+
+    renderDashboard(buildByJob(filterCandidateCards('open')));
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display     = 'block';
+    t.sizeTo('#app').catch(function() {});
+
+    // ── Async: fetch custom fields via REST API ──────────────
+    var restApi = t.getRestApi();
+    restApi.isAuthorized().then(function(isAuthorized) {
+      appData.restApiAuthorized = isAuthorized;
+      if (!isAuthorized) return;
+
+      // getRestApi() only provides auth helpers — use getToken() + fetch() for actual calls
+      return restApi.getToken().then(function(token) {
+        var key  = 'TESTAPIKEY';
+        var base = 'https://api.trello.com';
+
+        function apiFetch(path) {
+          var sep = path.indexOf('?') === -1 ? '?' : '&';
+          var url = base + path + sep + 'key=' + key + '&token=' + token;
+          return fetch(url).then(function(r) {
+            if (!r.ok) {
+              return r.text().then(function(txt) {
+                throw new Error('Trello API ' + r.status + ': ' + txt);
+              });
+            }
+            return r.json();
+          });
+        }
+
+        return Promise.all([
+          apiFetch('/1/boards/' + board.id + '/customFields'),
+          apiFetch('/1/boards/' + board.id + '/cards?customFieldItems=true&fields=id,idList,labels')
+        ]).then(function(cfResults) {
+          var fieldDefs = cfResults[0];
+          var cfCards   = cfResults[1];
+
+          function findFieldId(name) {
+            var f = fieldDefs.find(function(d) { return d.name.trim().toLowerCase() === name.toLowerCase(); });
+            return f ? f.id : null;
+          }
+          var fTotal     = findFieldId('Total');
+          var fHired     = findFieldId('Hired');
+          var fRemaining = findFieldId('Remaining');
+
+          var jobListIds = new Set();
+          if (openJobsList)   jobListIds.add(openJobsList.id);
+          if (closedJobsList) jobListIds.add(closedJobsList.id);
+
+          var cfData = {};
+          cfCards.forEach(function(card) {
+            if (!jobListIds.has(card.idList)) return;
+            var items = card.customFieldItems || [];
+            function getVal(fieldId) {
+              if (!fieldId) return null;
+              var item = items.find(function(i) { return i.idCustomField === fieldId; });
+              if (!item || !item.value) return null;
+              var n = parseFloat(item.value.number !== undefined ? item.value.number : item.value.text);
+              return isNaN(n) ? null : n;
+            }
+            var total = getVal(fTotal), hired = getVal(fHired), remaining = getVal(fRemaining);
+            (card.labels || []).forEach(function(l) {
+              var name = l.name || ('(no name - ' + l.color + ')');
+              if (!cfData[name]) cfData[name] = { total: null, hired: null, remaining: null };
+              if (total     !== null) cfData[name].total     = (cfData[name].total     || 0) + total;
+              if (hired     !== null) cfData[name].hired     = (cfData[name].hired     || 0) + hired;
+              if (remaining !== null) cfData[name].remaining = (cfData[name].remaining || 0) + remaining;
+            });
+          });
+
+          appData.customFieldData   = cfData;
+          appData.customFieldsReady = true;
+          if (document.getElementById('dashboard-switcher').value === 'hired-vs-remaining') {
+            renderHiredVsRemaining();
+          }
+          if (document.getElementById('dashboard-switcher').value === 'expected-hires') {
+            renderExpectedHires();
+          }
+
+          // ── Time to Hire card actions ──────────────────────────
+          var hireList  = lists.find(function(l) { return l.name.trim().toLowerCase() === 'hire'; });
+          var hireCards = hireList ? allCards.filter(function(c) { return c.idList === hireList.id; }) : [];
+
+          var tthPromise = hireCards.length === 0
+            ? Promise.resolve([])
+            : Promise.all(hireCards.map(function(card) {
+                return apiFetch('/1/cards/' + card.id + '/actions?filter=updateCard:idList,createCard')
+                  .then(function(actions) { return { card: card, actions: actions }; });
+              }));
+
+          // ── Risk Alerts card actions ───────────────────────────
+          var pubIdx  = lists.findIndex(function(l) { return l.name.trim().toLowerCase() === 'published candidates'; });
+          var hireIdx = lists.findIndex(function(l) { return l.name.trim().toLowerCase() === 'hire'; });
+          var stageLists = (pubIdx !== -1 && hireIdx !== -1 && pubIdx < hireIdx)
+            ? lists.slice(pubIdx, hireIdx) : [];
+          var stageListIds  = new Set(stageLists.map(function(l) { return l.id; }));
+          appData.riskAlertsStages = stageLists.map(function(l) { return l.name; });
+
+          var pipelineCards = allCards.filter(function(c) { return stageListIds.has(c.idList); });
+
+          var raPromise = pipelineCards.length === 0
+            ? Promise.resolve([])
+            : Promise.all(pipelineCards.map(function(card) {
+                return apiFetch('/1/cards/' + card.id + '/actions?filter=updateCard:idList,createCard,commentCard,addMemberToCard,updateCard:due&limit=100')
+                  .then(function(actions) { return { card: card, actions: actions }; });
+              }));
+
+          // ── Process both in parallel ───────────────────────────
+          return Promise.all([tthPromise, raPromise]).then(function(both) {
+            var tthResults = both[0];
+            var raResults  = both[1];
+
+            // --- Time to Hire ---
+            var tthData = [];
+            tthResults.forEach(function(r) {
+              var card = r.card, actions = r.actions;
+              var pubTs = null, hireTs = null;
+              actions.forEach(function(a) {
+                var d = a.data || {};
+                var listAfter = (d.listAfter || {}).name || '';
+                var listName  = (d.list      || {}).name || '';
+                var ts = new Date(a.date).getTime();
+                if (listAfter.trim().toLowerCase() === 'hire' && hireTs === null) hireTs = ts;
+                if (listAfter.trim().toLowerCase() === 'published candidates' || listName.trim().toLowerCase() === 'published candidates') {
+                  if (pubTs === null || ts < pubTs) pubTs = ts;
+                }
+              });
+              if (pubTs === null || hireTs === null) return;
+              var days     = Math.abs(Math.round((hireTs - pubTs) / (1000 * 60 * 60 * 24)));
+              var jobLabel = (card.labels && card.labels.length > 0) ? card.labels[0] : null;
+              tthData.push({
+                job:      jobLabel ? (jobLabel.name || '(no label)') : '(no label)',
+                candidate: card.name,
+                days:     days,
+                color:    jobLabel ? (TRELLO_LABEL_COLOURS[jobLabel.color] || COLOUR_NO_LABEL) : COLOUR_UNASSIGNED,
+                labelId:  jobLabel ? jobLabel.id : null
+              });
+            });
+            appData.timeToHireData  = tthData;
+            appData.timeToHireReady = true;
+            if (document.getElementById('dashboard-switcher').value === 'time-to-hire') renderTimeToHire();
+
+            // --- Risk Alerts ---
+            var now    = Date.now();
+            var raData = [];
+
+            function actionLabel(a) {
+              var d = a.data || {}, tp = a.type;
+              if (tp === 'createCard')      return 'Card created';
+              if (tp === 'commentCard')     return 'Comment added';
+              if (tp === 'addMemberToCard') return 'Member assigned';
+              if (tp === 'updateCard') {
+                if (d.listAfter) return 'Moved to ' + d.listAfter.name;
+                if (d.due !== undefined) return 'Due date updated';
+                return 'Card updated';
+              }
+              return tp;
+            }
+
+            raResults.forEach(function(r) {
+              var card = r.card, actions = r.actions;
+              var pubTs = null;
+              actions.forEach(function(a) {
+                var d = a.data || {};
+                var listAfter = (d.listAfter || {}).name || '';
+                var listName  = (d.list      || {}).name || '';
+                var ts = new Date(a.date).getTime();
+                if (listAfter.trim().toLowerCase() === 'published candidates' || listName.trim().toLowerCase() === 'published candidates') {
+                  if (pubTs === null || ts < pubTs) pubTs = ts;
+                }
+              });
+              if (pubTs === null) return;
+
+              var daysInPipeline = Math.round((now - pubTs) / (1000 * 60 * 60 * 24));
+              var lastAction     = actions.length > 0 ? actions[0] : null;
+              var lastActionText = lastAction
+                ? actionLabel(lastAction) + ' on ' + new Date(lastAction.date).toLocaleDateString()
+                : '—';
+              var listObj  = lists.find(function(l) { return l.id === card.idList; });
+              var jobLabel = (card.labels && card.labels.length > 0) ? card.labels[0] : null;
+              raData.push({
+                job:        jobLabel ? (jobLabel.name || '(no label)') : '(no label)',
+                candidate:  card.name,
+                days:       daysInPipeline,
+                stage:      listObj ? listObj.name : '(unknown)',
+                lastAction: lastActionText,
+                color:      jobLabel ? (TRELLO_LABEL_COLOURS[jobLabel.color] || COLOUR_NO_LABEL) : COLOUR_UNASSIGNED,
+                labelId:    jobLabel ? jobLabel.id : null
+              });
+            });
+
+            appData.riskAlertsData  = raData;
+            appData.riskAlertsReady = true;
+            if (document.getElementById('dashboard-switcher').value === 'risk-alerts') renderRiskAlerts();
+          });
+        });
+      }); // end getToken
+    }).catch(function(err) {
+      console.warn('HR Dashboard (installation test): custom fields not loaded -', err);
+    });
+  })
+  .catch(function(err) {
+    showError('Error loading board data: ' + err.message);
+  });
+});
+</script>
+
+</body>
+</html>

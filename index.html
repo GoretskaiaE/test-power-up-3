@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>HR Dashboard Power-Up (installation test)</title>
+  <script src="https://p.trellocdn.com/power-up.min.js"></script>
+</head>
+<body>
+<script>
+  /* ============================================
+     HR Dashboard (installation test) Power-Up — Connector v5
+  ============================================ */
+
+  var BASE_URL = window.location.origin + window.location.pathname.replace('index.html', '');
+
+  window.TrelloPowerUp.initialize(
+    {
+      // ── Board button ───────────────────────────────────────────
+      'board-buttons': function(t, options) {
+        return [{
+          icon: BASE_URL + 'icon.svg',
+          text: 'HR Dashboard (installation test)',
+          callback: function(t) {
+            return t.modal({
+              title:      'HR Dashboard (installation test)',
+              url:        BASE_URL + 'dashboard.html',
+              height:     520,
+              fullscreen: false
+            });
+          }
+        }];
+      },
+
+      // ── Auth status ────────────────────────────────────────────
+      // t.getRestApi() returns the object directly — no .then()
+      'authorization-status': function(t, options) {
+        return t.getRestApi().isAuthorized().then(function(isAuthorized) {
+          return { authorized: isAuthorized };
+        });
+      },
+
+      // ── Show authorization ─────────────────────────────────────
+      'show-authorization': function(t, options) {
+        return t.popup({
+          title:  'Authorize HR Dashboard (installation test)',
+          url:    BASE_URL + 'authorize.html',
+          height: 220
+        });
+      }
+    },
+    {
+      appKey:  'TESTAPIKEY',
+      appName: 'HR Dashboard (installation test)'
+    }
+  );
+</script>
+</body>
+</html>
